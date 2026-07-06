@@ -188,72 +188,75 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
             context = browser.new_context(no_viewport=True)
             page = context.new_page()
             
-            page.goto("https://mbasic.facebook.com/login/identify/")
-            
-            update_status(f"⌨️ Typing number `{phone}`...")
-            input_box = page.locator('input:not([type="hidden"]):not([type="submit"]):not([type="button"])').first
-            input_box.fill(phone, timeout=10000)
-            
-            update_status(f"🖱️ Submitting form...")
-            input_box.press("Enter")
-            
-            update_status(f"🔎 Waiting for next step...")
-            
-            # Smart Wait: Wait for either a password box, a recovery option, or an error box
-            page.wait_for_selector('input[type="password"], input[value*="sms"], input[value*="email"], #login_error, [data-sigil="m_login_notice"]', timeout=15000)
-            
-            # Check if it hit an error/not found page
-            if page.locator('#login_error, [data-sigil="m_login_notice"]').is_visible():
-                update_status(f"❌ No account found (or blocked) for `{phone}`. Skipping...")
-                return
-            
-            # Check if we need to click "Try another way" if it asks for password
-            if page.locator('text="Try another way"').is_visible():
-                page.locator('text="Try another way"').first.click()
-                page.wait_for_selector('input[value*="sms"]', timeout=10000)
-            
-            update_status(f"🔘 Selecting SMS option...")
-            
-            # Select the radio button that corresponds to SMS/Phone
-            sms_radio = page.locator('input[type="radio"][value*="sms"]').first
-            if sms_radio.is_visible():
-                sms_radio.click()
-            else:
-                 # Fallback to general text click if radio is hidden/styled
-                 page.locator('text="SMS"').first.click(timeout=5000)
-            
-            update_status(f"🖱️ Clicking 'Continue' again...")
             try:
-                page.get_by_role("button", name="Continue", exact=True).first.click(timeout=10000)
-            except:
-                # Fallback if get_by_role fails
-                page.locator('input[type="submit"], button').first.click(timeout=10000)
-            
-            page.wait_for_selector('input[name="n"], input[name="c"], input[type="text"], input[type="number"]', timeout=15000)
-            
-            global snap_mode
-            if snap_mode:
-                update_status(f"📸 Taking screenshot for `{phone}`...")
-                screenshot_path = f"snap_{phone.replace('+', '')}.png"
-                page.screenshot(path=screenshot_path)
-                with open(screenshot_path, 'rb') as snap_file:
-                    bot.send_photo(chat_id, snap_file, caption=f"✅ Code sent to `{phone}`")
-                os.remove(screenshot_path)
+                page.goto("https://mbasic.facebook.com/login/identify/")
+                
+                update_status(f"⌨️ Typing number `{phone}`...")
+                input_box = page.locator('input:not([type="hidden"]):not([type="submit"]):not([type="button"])').first
+                input_box.fill(phone, timeout=10000)
+                
+                update_status(f"🖱️ Clicking 'Search' button...")
+                page.locator('input[name="did_submit"], button[name="did_submit"], input[type="submit"], button[type="submit"]').first.click(timeout=10000)
+                
+                update_status(f"🔎 Waiting for next step...")
+                
+                # Smart Wait: Wait for either a password box, a recovery option, or an error box
+                page.wait_for_selector('input[type="password"], input[value*="sms"], input[value*="email"], #login_error, [data-sigil="m_login_notice"]', timeout=15000)
+                
+                # Check if it hit an error/not found page
+                if page.locator('#login_error, [data-sigil="m_login_notice"]').is_visible():
+                    update_status(f"❌ No account found (or blocked) for `{phone}`. Skipping...")
+                    return
+                
+                # Check if we need to click "Try another way" if it asks for password
+                if page.locator('text="Try another way"').is_visible():
+                    page.locator('text="Try another way"').first.click()
+                    page.wait_for_selector('input[value*="sms"]', timeout=10000)
+                
+                update_status(f"🔘 Selecting SMS option...")
+                
+                # Select the radio button that corresponds to SMS/Phone
+                sms_radio = page.locator('input[type="radio"][value*="sms"]').first
+                if sms_radio.is_visible():
+                    sms_radio.click()
+                else:
+                     # Fallback to general text click if radio is hidden/styled
+                     page.locator('text="SMS"').first.click(timeout=5000)
+                
+                update_status(f"🖱️ Clicking 'Continue' again...")
+                try:
+                    page.get_by_role("button", name="Continue", exact=True).first.click(timeout=10000)
+                except:
+                    # Fallback if get_by_role fails
+                    page.locator('input[type="submit"], button').first.click(timeout=10000)
+                
+                page.wait_for_selector('input[name="n"], input[name="c"], input[type="text"], input[type="number"]', timeout=15000)
+                
+                global snap_mode
+                if snap_mode:
+                    update_status(f"📸 Taking screenshot for `{phone}`...")
+                    screenshot_path = f"snap_{phone.replace('+', '')}.png"
+                    page.screenshot(path=screenshot_path)
+                    with open(screenshot_path, 'rb') as snap_file:
+                        bot.send_photo(chat_id, snap_file, caption=f"✅ Code sent to `{phone}`")
+                    os.remove(screenshot_path)
+                    
                 update_status(f"✅ **Success!** Code sent to `{phone}`.\n(Session closed)")
-            else:
-                update_status(f"✅ **Success!** Code sent to `{phone}`.\n(Session closed)")
-            
+                
+            except Exception as inner_e:
+                update_status(f"⚠️ **Error for `{phone}`:**\n{str(inner_e)[:150]}...")
+                try:
+                    error_snap = f"error_{phone.replace('+', '')}.png"
+                    page.screenshot(path=error_snap)
+                    with open(error_snap, 'rb') as snap_file:
+                        bot.send_photo(chat_id, snap_file, caption=f"⚠️ Error screen for `{phone}`")
+                    os.remove(error_snap)
+                except Exception as snap_e:
+                    print("Failed to send error snap:", snap_e)
+                    pass
+
     except Exception as e:
-        update_status(f"⚠️ **Error for `{phone}`:**\n{str(e)[:150]}...")
-        if page:
-            try:
-                error_snap = f"error_{phone.replace('+', '')}.png"
-                page.screenshot(path=error_snap)
-                with open(error_snap, 'rb') as snap_file:
-                    bot.send_photo(chat_id, snap_file, caption=f"⚠️ Error screen for `{phone}`")
-                os.remove(error_snap)
-            except:
-                pass
+        update_status(f"⚠️ **Browser Error for `{phone}`:**\n{str(e)[:150]}...")
 
 def main():
     print("Installing Playwright browsers and OS dependencies if missing...")
