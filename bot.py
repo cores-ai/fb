@@ -34,10 +34,22 @@ def send_welcome(chat_id):
     bot.send_message(
         chat_id, 
         "👋 **Welcome to FB Automation Bot**\n\n"
-        "Please send a **single phone number** (e.g. +1234567890) to process.",
+        "Please send a **single phone number** (e.g. +1234567890) or upload a **.txt/.csv** file to process.\n\n"
+        "Commands:\n"
+        "/stop - Stop all currently running tasks.",
         parse_mode="Markdown",
         reply_markup=markup
     )
+
+# Global flag to control processing
+stop_processing = False
+
+# Handle /stop command
+@bot.message_handler(commands=['stop'])
+def handle_stop(message):
+    global stop_processing
+    stop_processing = True
+    bot.reply_to(message, "🛑 Stop command received. Stopping all further tasks...")
 
 # Handle Ping Button
 @bot.callback_query_handler(func=lambda call: call.data == "ping")
@@ -89,7 +101,14 @@ def handle_document(message):
         bot.reply_to(message, f"⚠️ Error reading file: {str(e)}")
 
 def process_numbers_from_file(chat_id, numbers):
+    global stop_processing
+    stop_processing = False
+    
     for idx, num in enumerate(numbers):
+        if stop_processing:
+            bot.send_message(chat_id, "🛑 Processing stopped by user.", parse_mode="Markdown")
+            break
+            
         status_msg = bot.send_message(chat_id, f"⏳ Processing {idx+1}/{len(numbers)}: `{num}`...", parse_mode="Markdown")
         run_playwright_task(chat_id, num, status_msg.message_id)
         time.sleep(2) # Small delay between processing each number
@@ -112,11 +131,20 @@ def handle_number(message):
     except:
         pass
 
+    global stop_processing
+    stop_processing = False
+    
     # Send one single status message that we will constantly edit
     status_msg = bot.send_message(chat_id, f"⏳ Starting process for `{user_input}`...", parse_mode="Markdown")
     
     # Run Playwright in a background thread so the bot doesn't freeze
-    threading.Thread(target=run_playwright_task, args=(chat_id, user_input, status_msg.message_id)).start()
+    threading.Thread(target=run_playwright_task_wrapper, args=(chat_id, user_input, status_msg.message_id)).start()
+
+def run_playwright_task_wrapper(chat_id, user_input, status_msg_id):
+    if stop_processing:
+         bot.edit_message_text("🛑 Process cancelled before starting.", chat_id, status_msg_id)
+         return
+    run_playwright_task(chat_id, user_input, status_msg_id)
 
 # Playwright automation task
 def run_playwright_task(chat_id, user_input, status_msg_id):
