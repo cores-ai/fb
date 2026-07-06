@@ -162,7 +162,7 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
     try:
         with sync_playwright() as p:
             update_status(f"🌐 Launching browser for `{phone}`...")
-            browser = p.chromium.launch(headless=True, args=['--window-size=450,750'])
+            browser = p.chromium.launch(headless=True, args=['--window-size=450,750', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
             context = browser.new_context(no_viewport=True)
             page = context.new_page()
             
