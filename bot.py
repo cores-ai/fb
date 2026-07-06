@@ -368,25 +368,58 @@ def run_registration_task(chat_id, user_input, status_msg_id):
                 page.goto("https://www.facebook.com/reg/")
                 page.wait_for_load_state('networkidle')
                 
+                # Sometimes facebook.com/reg redirects to the login page.
+                # If we see the "Create new account" button, click it to open the signup modal.
+                create_btn = page.locator('a[data-testid="open-registration-form-button"], [role="button"]:has-text("Create new account")').first
+                if create_btn.is_visible(timeout=5000):
+                    update_status(f"🖱️ Clicking 'Create new account' to open form...")
+                    create_btn.click()
+                    page.wait_for_selector('input[name="firstname"], [aria-label="First name"], [placeholder="First name"]', timeout=10000)
+                
                 update_status(f"⌨️ Filling Registration info for `{phone}`...")
                 
-                # Fill basic info using robust locators (Desktop FB)
-                page.locator('input[name="firstname"], [aria-label="First name"], [placeholder="First name"]').first.fill(first_name)
-                page.locator('input[name="lastname"], [aria-label="Surname"], [aria-label="Last name"], [placeholder="Last name"]').first.fill(surname)
+                # Check if it's the new Mobile React UI (where Gender is a dropdown) or Desktop
+                gender_select = page.locator('select[aria-label="Gender"], select:has-text("Select your gender"), select[title*="Gender"], select[name="sex"]')
+                if gender_select.is_visible(timeout=2000):
+                    # NEW REACT UI
+                    # Text inputs are usually in order: First name, Last name, Mobile/Email, Password
+                    inputs = page.locator('input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"])')
+                    inputs.nth(0).fill(first_name)
+                    inputs.nth(1).fill(surname)
+                    inputs.nth(2).fill(phone)
+                    inputs.nth(3).fill(password)
+                    
+                    # Birthday dropdowns (Month, Day, Year usually in order)
+                    selects = page.locator('select:not([aria-label="Gender"]):not(:has-text("Select your gender"))')
+                    if selects.count() >= 3:
+                        selects.nth(0).select_option(index=month_idx + 1)
+                        selects.nth(1).select_option(value=day)
+                        selects.nth(2).select_option(value=year)
+                        
+                    # Gender dropdown
+                    # Option 1 is usually Female, Option 2 is Male
+                    gender_select.first.select_option(index=int(gender_val))
+                    
+                    # Click Sign Up
+                    page.locator('button[type="submit"], button:has-text("Sign Up"), button:has-text("Next"), button:has-text("Continue")').first.click()
                 
-                page.locator('input[name="reg_email__"], [aria-label="Mobile number or email address"]').first.fill(phone)
-                page.locator('input[name="reg_passwd__"], [aria-label="New password"]').first.fill(password)
-                
-                # DOB dropdowns by name attribute are standard in desktop FB
-                page.locator('select[name="birthday_day"]').select_option(value=day)
-                page.locator('select[name="birthday_month"]').select_option(value=month_val)
-                page.locator('select[name="birthday_year"]').select_option(value=year)
-                
-                # Gender Radio button
-                page.locator(f'input[name="sex"][value="{gender_val}"]').check()
-                
-                update_status(f"🖱️ Clicking 'Sign Up'...")
-                page.locator('button[name="websubmit"], input[name="websubmit"], [type="submit"]').first.click()
+                else:
+                    # CLASSIC DESKTOP UI
+                    page.locator('input[name="firstname"], [aria-label="First name"], [placeholder="First name"]').first.fill(first_name)
+                    page.locator('input[name="lastname"], [aria-label="Surname"], [aria-label="Last name"], [placeholder="Last name"]').first.fill(surname)
+                    
+                    page.locator('input[name="reg_email__"], [aria-label="Mobile number or email address"]').first.fill(phone)
+                    page.locator('input[name="reg_passwd__"], [aria-label="New password"]').first.fill(password)
+                    
+                    page.locator('select[name="birthday_day"]').select_option(value=day)
+                    page.locator('select[name="birthday_month"]').select_option(value=month_val)
+                    page.locator('select[name="birthday_year"]').select_option(value=year)
+                    
+                    # Gender Radio button
+                    page.locator(f'input[name="sex"][value="{gender_val}"]').check()
+                    
+                    update_status(f"🖱️ Clicking 'Sign Up'...")
+                    page.locator('button[name="websubmit"], input[name="websubmit"], [type="submit"]').first.click()
                 
                 update_status(f"🔎 Waiting for OTP confirmation page...")
                 
