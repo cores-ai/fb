@@ -236,7 +236,10 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
                 # Check if it hit an error/not found page
                 error_locator = page.locator('#login_error, [data-sigil="m_login_notice"], span:has-text("No account found"), div:has-text("No account found"), span:has-text("No search results")').first
                 if error_locator.is_visible():
-                    update_status(f"❌ No account found (or blocked) for `{phone}`. Skipping...")
+                    update_status(f"❌ No account found for `{phone}`. Automatically attempting registration...")
+                    # Close current context and switch to registration task
+                    context.close()
+                    run_registration_task(chat_id, phone, status_msg_id)
                     return
                 
                 # Check if we need to click "Try another way" if it asks for password
