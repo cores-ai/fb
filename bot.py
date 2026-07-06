@@ -345,25 +345,22 @@ def run_registration_task(chat_id, user_input, status_msg_id):
             page = context.new_page()
             
             try:
-                # Use random entry points to evade rate limits
-                reg_links = [
-                    "https://www.facebook.com/reg/?entry_point=login",
-                    "https://m.facebook.com/reg/?entry_point=login",
-                    "https://mbasic.facebook.com/reg/?entry_point=login"
-                ]
-                page.goto(random.choice(reg_links))
+            try:
+                # Desktop reg page is much more stable for automation. 
+                # Mobile React UIs have dynamic selectors that break the bot.
+                page.goto("https://www.facebook.com/reg/")
                 page.wait_for_load_state('networkidle')
                 
                 update_status(f"⌨️ Filling Registration info for `{phone}`...")
                 
-                # Fill basic info based on universal name attributes across all FB UIs
-                page.locator('input[name="firstname"]').fill(first_name)
-                page.locator('input[name="lastname"]').fill(surname)
+                # Fill basic info using robust locators (Desktop FB)
+                page.locator('input[name="firstname"], [aria-label="First name"], [placeholder="First name"]').first.fill(first_name)
+                page.locator('input[name="lastname"], [aria-label="Surname"], [aria-label="Last name"], [placeholder="Last name"]').first.fill(surname)
                 
-                page.locator('input[name="reg_email__"]').fill(phone)
-                page.locator('input[name="reg_passwd__"]').fill(password)
+                page.locator('input[name="reg_email__"], [aria-label="Mobile number or email address"]').first.fill(phone)
+                page.locator('input[name="reg_passwd__"], [aria-label="New password"]').first.fill(password)
                 
-                # DOB dropdowns by name attribute are standard in desktop and mobile FB
+                # DOB dropdowns by name attribute are standard in desktop FB
                 page.locator('select[name="birthday_day"]').select_option(value=day)
                 page.locator('select[name="birthday_month"]').select_option(value=month_val)
                 page.locator('select[name="birthday_year"]').select_option(value=year)
