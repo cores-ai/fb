@@ -239,9 +239,14 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
             update_status(f"🌐 Launching browser for `{phone}`...")
             browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
             
-            # Generate random fingerprint
-            user_agent = fake.user_agent()
-            viewport = {'width': random.randint(350, 550), 'height': random.randint(650, 950)}
+            # Generate modern mobile Chrome fingerprint
+            mobile_uas = [
+                "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36",
+                "Mozilla/5.0 (Linux; Android 12; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36",
+                "Mozilla/5.0 (Linux; Android 14; SM-G991U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Mobile Safari/537.36"
+            ]
+            user_agent = random.choice(mobile_uas)
+            viewport = {'width': random.randint(350, 430), 'height': random.randint(750, 950)}
             
             context = browser.new_context(user_agent=user_agent, viewport=viewport)
             page = context.new_page()
@@ -365,9 +370,14 @@ def run_registration_task(chat_id, user_input, status_msg_id):
             update_status(f"🌐 Launching browser for Reg `{phone}`...")
             browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
             
-            # Generate random fingerprint
-            user_agent = fake.user_agent()
-            viewport = {'width': random.randint(1000, 1400), 'height': random.randint(700, 1000)}
+            # Generate modern desktop Chrome fingerprint
+            desktop_uas = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+            ]
+            user_agent = random.choice(desktop_uas)
+            viewport = {'width': random.randint(1200, 1600), 'height': random.randint(800, 1000)}
             
             context = browser.new_context(user_agent=user_agent, viewport=viewport)
             page = context.new_page()
