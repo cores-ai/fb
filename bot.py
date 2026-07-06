@@ -6,6 +6,12 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 import re
+from faker import Faker
+import random
+import string
+
+# Initialize Faker
+fake = Faker()
 
 # Load environment variables
 load_dotenv()
@@ -37,7 +43,8 @@ def send_welcome(chat_id):
         "Please send a **single phone number** (e.g. +1234567890) or upload a **.txt/.csv** file to process.\n\n"
         "Commands:\n"
         "/stop - Stop all currently running tasks.\n"
-        "/snap on/off - Enable or disable success screenshots.",
+        "/snap on/off - Enable or disable success screenshots.\n"
+        "/register <phone> - Auto-create a new Facebook account.",
         parse_mode="Markdown",
         reply_markup=markup
     )
@@ -67,6 +74,29 @@ def handle_snap(message):
     else:
         state = 'ON' if snap_mode else 'OFF'
         bot.reply_to(message, f"📸 Snapshot mode is currently **{state}**.\nUse `/snap on` or `/snap off` to change.", parse_mode="Markdown")
+
+# Handle /register command
+@bot.message_handler(commands=['register'])
+def handle_register(message):
+    chat_id = message.chat.id
+    text = message.text.replace('/register', '').strip()
+    
+    if not text:
+        msg = bot.reply_to(message, "⚠️ Please provide a phone number. Example: `/register +1234567890`", parse_mode="Markdown")
+        threading.Thread(target=delete_msg, args=(chat_id, msg.message_id, 3)).start()
+        return
+        
+    phone = text
+    if not phone.startswith('+'):
+        phone = '+' + phone
+        
+    status_msg = bot.send_message(chat_id, f"📝 Starting registration process for `{phone}`...", parse_mode="Markdown")
+    
+    global stop_processing
+    stop_processing = False
+    
+    # Run in background to avoid blocking the bot
+    threading.Thread(target=run_registration_task, args=(chat_id, phone, status_msg.message_id)).start()
 
 # Handle Ping Button
 @bot.callback_query_handler(func=lambda call: call.data == "ping")
@@ -254,6 +284,106 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
                     os.remove(error_snap)
                 except Exception as snap_e:
                     print("Failed to send error snap:", snap_e)
+                    pass
+
+    except Exception as e:
+        update_status(f"⚠️ **Browser Error for `{phone}`:**\n{str(e)[:150]}...")
+
+# Facebook Registration task
+def run_registration_task(chat_id, user_input, status_msg_id):
+    def update_status(text):
+        try:
+            bot.edit_message_text(text, chat_id, status_msg_id, parse_mode="Markdown")
+        except Exception:
+            pass
+
+    phone = str(user_input).strip()
+    if not phone.startswith('+'):
+        phone = '+' + phone
+
+    # Generate synthetic user data
+    first_name = fake.first_name()
+    surname = fake.last_name()
+    # Random DOB: Year between 1980 and 2004, random month/day
+    year = str(random.randint(1980, 2004))
+    month_idx = random.randint(0, 11)
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    month_val = str(month_idx + 1)
+    day = str(random.randint(1, 28))
+    # Gender (1: Female, 2: Male)
+    gender_val = "2" if random.random() > 0.5 else "1"
+    
+    # Generate random 12-char password
+    characters = string.ascii_letters + string.digits + "!@#$%^&*"
+    password = ''.join(random.choice(characters) for i in range(12))
+
+    page = None
+    try:
+        with sync_playwright() as p:
+            update_status(f"🌐 Launching browser for Reg `{phone}`...")
+            browser = p.chromium.launch(headless=True, args=['--window-size=1200,800', '--no-sandbox', '--disable-setuid-sandbox'])
+            context = browser.new_context()
+            page = context.new_page()
+            
+            try:
+                # Desktop reg page is often more stable for automation
+                page.goto("https://www.facebook.com/reg/")
+                page.wait_for_load_state('networkidle')
+                
+                update_status(f"⌨️ Filling Registration info for `{phone}`...")
+                
+                # Fill basic info based on the provided screenshot structure
+                page.get_by_label("First name").fill(first_name)
+                page.get_by_label("Surname").fill(surname)
+                
+                page.get_by_label("Mobile number or email address").fill(phone)
+                page.get_by_label("New password").fill(password)
+                
+                # DOB dropdowns by name attribute are standard in desktop FB
+                page.locator('select[name="birthday_day"]').select_option(value=day)
+                page.locator('select[name="birthday_month"]').select_option(value=month_val)
+                page.locator('select[name="birthday_year"]').select_option(value=year)
+                
+                # Gender Radio button
+                page.locator(f'input[name="sex"][value="{gender_val}"]').check()
+                
+                update_status(f"🖱️ Clicking 'Sign Up'...")
+                page.get_by_role("button", name="Sign Up", exact=True).click()
+                
+                update_status(f"🔎 Waiting for OTP confirmation page...")
+                
+                # Wait for the confirmation code input box or an error
+                page.wait_for_selector('input[name="code"], #reg_error, ._5v-0', timeout=20000)
+                
+                # Handle error if it appears
+                if page.locator('#reg_error, ._5v-0').is_visible():
+                    err_txt = page.locator('#reg_error, ._5v-0').inner_text()
+                    update_status(f"❌ **Registration Failed** for `{phone}`:\n{err_txt}")
+                    return
+                
+                update_status(f"✅ **Success!** Reached OTP page for `{phone}`.\nName: {first_name} {surname}\nPass: `{password}`")
+                
+                global snap_mode
+                if snap_mode:
+                    screenshot_path = f"reg_snap_{phone.replace('+', '')}.png"
+                    page.screenshot(path=screenshot_path)
+                    with open(screenshot_path, 'rb') as snap_file:
+                        bot.send_photo(chat_id, snap_file, caption=f"✅ OTP screen for `{phone}`")
+                    os.remove(screenshot_path)
+                    
+                # Append to a local file so we don't lose the credentials
+                with open("created_accounts.txt", "a", encoding="utf-8") as f:
+                    f.write(f"{phone} | {password} | {first_name} {surname} | {day}-{months[month_idx]}-{year}\n")
+                
+            except Exception as inner_e:
+                update_status(f"⚠️ **Error for `{phone}`:**\n{str(inner_e)[:150]}...")
+                try:
+                    error_snap = f"reg_error_{phone.replace('+', '')}.png"
+                    page.screenshot(path=error_snap)
+                    with open(error_snap, 'rb') as snap_file:
+                        bot.send_photo(chat_id, snap_file, caption=f"⚠️ Reg Error screen for `{phone}`")
+                    os.remove(error_snap)
+                except:
                     pass
 
     except Exception as e:
