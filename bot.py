@@ -345,7 +345,6 @@ def run_registration_task(chat_id, user_input, status_msg_id):
             page = context.new_page()
             
             try:
-            try:
                 # Desktop reg page is much more stable for automation. 
                 # Mobile React UIs have dynamic selectors that break the bot.
                 page.goto("https://www.facebook.com/reg/")
