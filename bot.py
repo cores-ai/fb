@@ -36,13 +36,15 @@ def send_welcome(chat_id):
         "👋 **Welcome to FB Automation Bot**\n\n"
         "Please send a **single phone number** (e.g. +1234567890) or upload a **.txt/.csv** file to process.\n\n"
         "Commands:\n"
-        "/stop - Stop all currently running tasks.",
+        "/stop - Stop all currently running tasks.\n"
+        "/snap on/off - Enable or disable success screenshots.",
         parse_mode="Markdown",
         reply_markup=markup
     )
 
 # Global flag to control processing
 stop_processing = False
+snap_mode = False
 
 # Handle /stop command
 @bot.message_handler(commands=['stop'])
@@ -50,6 +52,21 @@ def handle_stop(message):
     global stop_processing
     stop_processing = True
     bot.reply_to(message, "🛑 Stop command received. Stopping all further tasks...")
+
+# Handle /snap command
+@bot.message_handler(commands=['snap'])
+def handle_snap(message):
+    global snap_mode
+    text = message.text.lower().strip()
+    if 'on' in text:
+        snap_mode = True
+        bot.reply_to(message, "📸 Snapshot mode **ON**. You will receive screenshots on success.", parse_mode="Markdown")
+    elif 'off' in text:
+        snap_mode = False
+        bot.reply_to(message, "📸 Snapshot mode **OFF**.", parse_mode="Markdown")
+    else:
+        state = 'ON' if snap_mode else 'OFF'
+        bot.reply_to(message, f"📸 Snapshot mode is currently **{state}**.\nUse `/snap on` or `/snap off` to change.", parse_mode="Markdown")
 
 # Handle Ping Button
 @bot.callback_query_handler(func=lambda call: call.data == "ping")
@@ -111,7 +128,11 @@ def process_numbers_from_file(chat_id, numbers):
             
         status_msg = bot.send_message(chat_id, f"⏳ Processing {idx+1}/{len(numbers)}: `{num}`...", parse_mode="Markdown")
         run_playwright_task(chat_id, num, status_msg.message_id)
-        time.sleep(2) # Small delay between processing each number
+        
+        # Add cooldown between accounts to prevent IP blocks
+        if idx < len(numbers) - 1 and not stop_processing:
+            bot.send_message(chat_id, f"🕒 Cooldown: Waiting 10 seconds to protect IP from blocking...")
+            time.sleep(10)
 
 # Handle any text message (assuming it's a number)
 @bot.message_handler(content_types=['text'])
@@ -173,19 +194,34 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
             input_box.fill(phone, timeout=10000)
             
             update_status(f"🖱️ Clicking 'Continue'...")
-            page.locator('text="Continue"').first.click(timeout=10000)
+            page.locator('input[type="submit"], button[type="submit"]').first.click(timeout=10000)
             
-            update_status(f"🔎 Waiting for SMS option...")
-            page.wait_for_selector('text="Get code via SMS"', timeout=15000)
+            update_status(f"🔎 Waiting for next step...")
+            page.wait_for_selector('text="Get code via SMS", text="No account found"', timeout=15000)
+            
+            if page.locator('text="No account found"').is_visible():
+                update_status(f"❌ No account found for `{phone}`. Skipping...")
+                return
             
             update_status(f"🔘 Selecting SMS option...")
             page.locator('text="Get code via SMS"').first.click()
             
             update_status(f"🖱️ Clicking 'Continue' again...")
-            page.locator('text="Continue"').first.click(timeout=10000)
+            page.locator('input[type="submit"], button[type="submit"]').first.click(timeout=10000)
             
-            page.wait_for_selector('text="Confirm your account"', timeout=15000)
-            update_status(f"✅ **Success!** Code sent to `{phone}`.\n(Session closed)")
+            page.wait_for_selector('input[name="n"], input[name="c"], input[type="text"], input[type="number"]', timeout=15000)
+            
+            global snap_mode
+            if snap_mode:
+                update_status(f"📸 Taking screenshot for `{phone}`...")
+                screenshot_path = f"snap_{phone.replace('+', '')}.png"
+                page.screenshot(path=screenshot_path)
+                with open(screenshot_path, 'rb') as snap_file:
+                    bot.send_photo(chat_id, snap_file, caption=f"✅ Code sent to `{phone}`")
+                os.remove(screenshot_path)
+                update_status(f"✅ **Success!** Code sent to `{phone}`.\n(Session closed)")
+            else:
+                update_status(f"✅ **Success!** Code sent to `{phone}`.\n(Session closed)")
             
     except Exception as e:
         update_status(f"⚠️ **Error for `{phone}`:**\n{str(e)[:150]}...")
