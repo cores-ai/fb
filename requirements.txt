@@ -1,0 +1,4 @@
+# Python dependencies
+python-dotenv==1.0.1
+pyTelegramBotAPI==4.15.4
+playwright==1.42.0
