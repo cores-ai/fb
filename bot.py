@@ -219,6 +219,7 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
     if not phone.startswith('+'):
         phone = '+' + phone
 
+    needs_registration = False
     page = None
     try:
         with sync_playwright() as p:
@@ -249,16 +250,13 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
                 # Check if it hit an error/not found page
                 error_locator = page.locator('#login_error, [data-sigil="m_login_notice"], span:has-text("No account found"), div:has-text("No account found"), span:has-text("No search results")').first
                 if error_locator.is_visible():
-                    update_status(f"❌ No account found for `{phone}`. Automatically attempting registration...")
-                    # Close current context and switch to registration task
-                    context.close()
-                    run_registration_task(chat_id, phone, status_msg_id)
-                    return
+                    needs_registration = True
                 
-                # Check if we need to click "Try another way" if it asks for password
-                if page.locator('text="Try another way"').is_visible():
-                    page.locator('text="Try another way"').first.click()
-                    page.wait_for_selector('input[value*="sms"]', timeout=10000)
+                if not needs_registration:
+                    # Check if we need to click "Try another way" if it asks for password
+                    if page.locator('text="Try another way"').is_visible():
+                        page.locator('text="Try another way"').first.click()
+                        page.wait_for_selector('input[value*="sms"]', timeout=10000)
                 
                 update_status(f"🔘 Selecting SMS option...")
                 
@@ -304,6 +302,11 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
 
     except Exception as e:
         update_status(f"⚠️ **Browser Error for `{phone}`:**\n{str(e)[:150]}...")
+
+    # Run registration AFTER closing the original playwright sync session
+    if needs_registration:
+        update_status(f"❌ No account found for `{phone}`. Automatically attempting registration...")
+        run_registration_task(chat_id, phone, status_msg_id)
 
 # Facebook Registration task
 def run_registration_task(chat_id, user_input, status_msg_id):
