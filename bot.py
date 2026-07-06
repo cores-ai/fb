@@ -193,8 +193,8 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
             input_box = page.locator('input:not([type="hidden"]):not([type="submit"]):not([type="button"])').first
             input_box.fill(phone, timeout=10000)
             
-            update_status(f"🖱️ Clicking 'Continue'...")
-            page.locator('input[type="submit"], button[type="submit"]').first.click(timeout=10000)
+            update_status(f"🖱️ Submitting form...")
+            input_box.press("Enter")
             
             update_status(f"🔎 Waiting for next step...")
             page.wait_for_selector('text="Get code via SMS", text="No account found"', timeout=15000)
@@ -207,7 +207,11 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
             page.locator('text="Get code via SMS"').first.click()
             
             update_status(f"🖱️ Clicking 'Continue' again...")
-            page.locator('input[type="submit"], button[type="submit"]').first.click(timeout=10000)
+            try:
+                page.get_by_role("button", name="Continue", exact=True).first.click(timeout=10000)
+            except:
+                # Fallback if get_by_role fails
+                page.locator('input[type="submit"], button').first.click(timeout=10000)
             
             page.wait_for_selector('input[name="n"], input[name="c"], input[type="text"], input[type="number"]', timeout=15000)
             
