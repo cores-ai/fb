@@ -237,8 +237,13 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
     try:
         with sync_playwright() as p:
             update_status(f"🌐 Launching browser for `{phone}`...")
-            browser = p.chromium.launch(headless=True, args=['--window-size=450,750', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
-            context = browser.new_context(no_viewport=True)
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
+            
+            # Generate random fingerprint
+            user_agent = fake.user_agent()
+            viewport = {'width': random.randint(350, 550), 'height': random.randint(650, 950)}
+            
+            context = browser.new_context(user_agent=user_agent, viewport=viewport)
             page = context.new_page()
             
             try:
@@ -358,8 +363,13 @@ def run_registration_task(chat_id, user_input, status_msg_id):
     try:
         with sync_playwright() as p:
             update_status(f"🌐 Launching browser for Reg `{phone}`...")
-            browser = p.chromium.launch(headless=True, args=['--window-size=1200,800', '--no-sandbox', '--disable-setuid-sandbox'])
-            context = browser.new_context()
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'])
+            
+            # Generate random fingerprint
+            user_agent = fake.user_agent()
+            viewport = {'width': random.randint(1000, 1400), 'height': random.randint(700, 1000)}
+            
+            context = browser.new_context(user_agent=user_agent, viewport=viewport)
             page = context.new_page()
             
             try:
