@@ -130,6 +130,8 @@ def handle_document(message):
         numbers = []
         seen = set()
         for num in raw_numbers:
+            if not num.startswith('+'):
+                num = '+' + num
             if num not in seen:
                 seen.add(num)
                 numbers.append(num)
@@ -164,15 +166,26 @@ def process_numbers_from_file(chat_id, numbers):
             bot.send_message(chat_id, f"🕒 Cooldown: Waiting 10 seconds to protect IP from blocking...")
             time.sleep(10)
 
-# Handle any text message (assuming it's a number)
+# Handle any text message (assuming it contains numbers)
 @bot.message_handler(content_types=['text'])
 def handle_number(message):
     chat_id = message.chat.id
     user_input = message.text.strip()
     
-    # Simple check if it contains numbers
-    if not any(char.isdigit() for char in user_input):
-        msg = bot.reply_to(message, "⚠️ Please send a valid phone number.")
+    # Extract sequences of 8 to 15 digits (with optional + sign)
+    raw_numbers = re.findall(r'\+?\d{8,15}', user_input)
+    
+    numbers = []
+    seen = set()
+    for num in raw_numbers:
+        if not num.startswith('+'):
+            num = '+' + num
+        if num not in seen:
+            seen.add(num)
+            numbers.append(num)
+
+    if not numbers:
+        msg = bot.reply_to(message, "⚠️ Please send a valid phone number or a list of numbers.")
         threading.Thread(target=delete_msg, args=(chat_id, msg.message_id, 3)).start()
         return
 
@@ -182,14 +195,10 @@ def handle_number(message):
     except:
         pass
 
-    global stop_processing
-    stop_processing = False
+    bot.send_message(chat_id, f"✅ Found {len(numbers)} numbers in your message. Starting batch process...")
     
-    # Send one single status message that we will constantly edit
-    status_msg = bot.send_message(chat_id, f"⏳ Starting process for `{user_input}`...", parse_mode="Markdown")
-    
-    # Run Playwright in a background thread so the bot doesn't freeze
-    threading.Thread(target=run_playwright_task_wrapper, args=(chat_id, user_input, status_msg.message_id)).start()
+    # Process them in a background thread
+    threading.Thread(target=process_numbers_from_file, args=(chat_id, numbers)).start()
 
 def run_playwright_task_wrapper(chat_id, user_input, status_msg_id):
     if stop_processing:
