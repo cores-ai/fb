@@ -198,14 +198,29 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
             input_box.press("Enter")
             
             update_status(f"🔎 Waiting for next step...")
-            page.wait_for_selector('text="Get code via SMS", text="No account found"', timeout=15000)
             
-            if page.locator('text="No account found"').is_visible():
-                update_status(f"❌ No account found for `{phone}`. Skipping...")
+            # Smart Wait: Wait for either a password box, a recovery option, or an error box
+            page.wait_for_selector('input[type="password"], input[value*="sms"], input[value*="email"], #login_error, [data-sigil="m_login_notice"]', timeout=15000)
+            
+            # Check if it hit an error/not found page
+            if page.locator('#login_error, [data-sigil="m_login_notice"]').is_visible():
+                update_status(f"❌ No account found (or blocked) for `{phone}`. Skipping...")
                 return
             
+            # Check if we need to click "Try another way" if it asks for password
+            if page.locator('text="Try another way"').is_visible():
+                page.locator('text="Try another way"').first.click()
+                page.wait_for_selector('input[value*="sms"]', timeout=10000)
+            
             update_status(f"🔘 Selecting SMS option...")
-            page.locator('text="Get code via SMS"').first.click()
+            
+            # Select the radio button that corresponds to SMS/Phone
+            sms_radio = page.locator('input[type="radio"][value*="sms"]').first
+            if sms_radio.is_visible():
+                sms_radio.click()
+            else:
+                 # Fallback to general text click if radio is hidden/styled
+                 page.locator('text="SMS"').first.click(timeout=5000)
             
             update_status(f"🖱️ Clicking 'Continue' again...")
             try:
