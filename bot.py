@@ -196,7 +196,7 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
                 input_box.fill(phone, timeout=10000)
                 
                 update_status(f"🖱️ Clicking 'Search' button...")
-                page.locator('button:has-text("Continue"), button:has-text("Search"), input[type="submit"], [name="did_submit"]').first.click(timeout=10000)
+                page.locator('button:has-text("Continue"), button:has-text("Search"), input[type="submit"], [name="did_submit"], span:has-text("Continue"), span:has-text("Search")').first.click(timeout=10000)
                 
                 update_status(f"🔎 Waiting for next step...")
                 
