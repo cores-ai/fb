@@ -59,8 +59,8 @@ def handle_stop(message):
     global stop_processing
     stop_processing = True
     msg = bot.reply_to(message, "🛑 Stop command received. Stopping all further tasks...")
-    threading.Thread(target=delete_msg, args=(message.chat.id, message.message_id, 120)).start()
-    threading.Thread(target=delete_msg, args=(message.chat.id, msg.message_id, 120)).start()
+    threading.Thread(target=delete_msg, args=(message.chat.id, message.message_id, 5)).start()
+    threading.Thread(target=delete_msg, args=(message.chat.id, msg.message_id, 5)).start()
 
 # Handle /snap command
 @bot.message_handler(commands=['snap'])
@@ -77,8 +77,8 @@ def handle_snap(message):
         state = 'ON' if snap_mode else 'OFF'
         msg = bot.reply_to(message, f"📸 Snapshot mode is currently **{state}**.\nUse `/snap on` or `/snap off` to change.", parse_mode="Markdown")
         
-    threading.Thread(target=delete_msg, args=(message.chat.id, message.message_id, 120)).start()
-    threading.Thread(target=delete_msg, args=(message.chat.id, msg.message_id, 120)).start()
+    threading.Thread(target=delete_msg, args=(message.chat.id, message.message_id, 5)).start()
+    threading.Thread(target=delete_msg, args=(message.chat.id, msg.message_id, 5)).start()
 
 # Handle /register command
 @bot.message_handler(commands=['register'])
@@ -100,8 +100,8 @@ def handle_register(message):
     global stop_processing
     stop_processing = False
     
-    # Delete user's command after 120s
-    threading.Thread(target=delete_msg, args=(chat_id, message.message_id, 120)).start()
+    # Delete user's command after 5s
+    threading.Thread(target=delete_msg, args=(chat_id, message.message_id, 5)).start()
     
     # Run in background to avoid blocking the bot
     threading.Thread(target=run_registration_task, args=(chat_id, phone, status_msg.message_id)).start()
@@ -151,9 +151,9 @@ def handle_document(message):
             
         msg = bot.reply_to(message, f"✅ Found {len(numbers)} numbers. Starting process...")
         
-        # Schedule deletion of user document and bot reply
-        threading.Thread(target=delete_msg, args=(chat_id, message.message_id, 120)).start()
-        threading.Thread(target=delete_msg, args=(chat_id, msg.message_id, 120)).start()
+        # Schedule deletion of user document and bot reply after 5s
+        threading.Thread(target=delete_msg, args=(chat_id, message.message_id, 5)).start()
+        threading.Thread(target=delete_msg, args=(chat_id, msg.message_id, 5)).start()
         
         # Process them in a background thread
         threading.Thread(target=process_numbers_from_file, args=(chat_id, numbers)).start()
@@ -175,7 +175,8 @@ def process_numbers_from_file(chat_id, numbers):
         
         # Add cooldown between accounts to prevent IP blocks
         if idx < len(numbers) - 1 and not stop_processing:
-            bot.send_message(chat_id, f"🕒 Cooldown: Waiting 10 seconds to protect IP from blocking...")
+            cool_msg = bot.send_message(chat_id, f"🕒 Cooldown: Waiting 10 seconds to protect IP from blocking...")
+            threading.Thread(target=delete_msg, args=(chat_id, cool_msg.message_id, 5)).start()
             time.sleep(10)
 
 # Handle any text message (assuming it contains numbers)
@@ -296,7 +297,7 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
                     page.screenshot(path=screenshot_path)
                     with open(screenshot_path, 'rb') as snap_file:
                         snap_msg = bot.send_photo(chat_id, snap_file, caption=f"✅ Code sent to `{phone}`")
-                        threading.Thread(target=delete_msg, args=(chat_id, snap_msg.message_id, 120)).start()
+                        threading.Thread(target=delete_msg, args=(chat_id, snap_msg.message_id, 5)).start()
                     os.remove(screenshot_path)
                     
                 update_status(f"✅ **Success!** Code sent to `{phone}`.\n(Session closed)")
@@ -308,7 +309,7 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
                     page.screenshot(path=error_snap)
                     with open(error_snap, 'rb') as snap_file:
                         err_msg = bot.send_photo(chat_id, snap_file, caption=f"⚠️ Error screen for `{phone}`")
-                        threading.Thread(target=delete_msg, args=(chat_id, err_msg.message_id, 120)).start()
+                        threading.Thread(target=delete_msg, args=(chat_id, err_msg.message_id, 5)).start()
                     os.remove(error_snap)
                 except Exception as snap_e:
                     print("Failed to send error snap:", snap_e)
@@ -323,7 +324,7 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
         run_registration_task(chat_id, phone, status_msg_id)
     else:
         # If no registration was triggered, schedule status msg for deletion
-        threading.Thread(target=delete_msg, args=(chat_id, status_msg_id, 120)).start()
+        threading.Thread(target=delete_msg, args=(chat_id, status_msg_id, 5)).start()
 
 # Facebook Registration task
 def run_registration_task(chat_id, user_input, status_msg_id):
@@ -406,7 +407,7 @@ def run_registration_task(chat_id, user_input, status_msg_id):
                     page.screenshot(path=screenshot_path)
                     with open(screenshot_path, 'rb') as snap_file:
                         snap_msg = bot.send_photo(chat_id, snap_file, caption=f"✅ OTP screen for `{phone}`")
-                        threading.Thread(target=delete_msg, args=(chat_id, snap_msg.message_id, 120)).start()
+                        threading.Thread(target=delete_msg, args=(chat_id, snap_msg.message_id, 5)).start()
                     os.remove(screenshot_path)
                     
                 # Append to a local file so we don't lose the credentials
@@ -420,7 +421,7 @@ def run_registration_task(chat_id, user_input, status_msg_id):
                     page.screenshot(path=error_snap)
                     with open(error_snap, 'rb') as snap_file:
                         err_msg = bot.send_photo(chat_id, snap_file, caption=f"⚠️ Reg Error screen for `{phone}`")
-                        threading.Thread(target=delete_msg, args=(chat_id, err_msg.message_id, 120)).start()
+                        threading.Thread(target=delete_msg, args=(chat_id, err_msg.message_id, 5)).start()
                     os.remove(error_snap)
                 except:
                     pass
@@ -428,8 +429,8 @@ def run_registration_task(chat_id, user_input, status_msg_id):
     except Exception as e:
         update_status(f"⚠️ **Browser Error for `{phone}`:**\n{str(e)[:150]}...")
         
-    # Delete the final status message after 120 seconds
-    threading.Thread(target=delete_msg, args=(chat_id, status_msg_id, 120)).start()
+    # Delete the final status message after 5 seconds
+    threading.Thread(target=delete_msg, args=(chat_id, status_msg_id, 5)).start()
 
 def main():
     print("Installing Playwright browsers and OS dependencies if missing...")
