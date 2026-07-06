@@ -191,6 +191,8 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
         update_status(f"⚠️ **Error for `{phone}`:**\n{str(e)[:150]}...")
 
 def main():
+    print("Installing Playwright browsers if missing...")
+    os.system("playwright install chromium")
     print("Bot is starting...")
     
     if CHAT_ID and CHAT_ID != 'your_telegram_chat_id_here':
