@@ -201,10 +201,10 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
                 update_status(f"🔎 Waiting for next step...")
                 
                 # Smart Wait: Wait for either a password box, a recovery option, or an error box
-                page.wait_for_selector('input[type="password"], input[value*="sms"], input[value*="email"], #login_error, [data-sigil="m_login_notice"]', timeout=15000)
+                page.wait_for_selector('input[type="password"], input[value*="sms"], input[value*="email"], #login_error, [data-sigil="m_login_notice"], text="No account found", text="No search results"', timeout=15000)
                 
                 # Check if it hit an error/not found page
-                if page.locator('#login_error, [data-sigil="m_login_notice"]').is_visible():
+                if page.locator('#login_error, [data-sigil="m_login_notice"], text="No account found", text="No search results"').is_visible():
                     update_status(f"❌ No account found (or blocked) for `{phone}`. Skipping...")
                     return
                 
