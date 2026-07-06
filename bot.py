@@ -219,7 +219,11 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
             page = context.new_page()
             
             try:
-                page.goto("https://mbasic.facebook.com/login/identify/")
+                identify_links = [
+                    "https://mbasic.facebook.com/login/identify/",
+                    "https://m.facebook.com/login/identify/"
+                ]
+                page.goto(random.choice(identify_links))
                 
                 update_status(f"⌨️ Typing number `{phone}`...")
                 input_box = page.locator('input:not([type="hidden"]):not([type="submit"]):not([type="button"])').first
@@ -329,20 +333,25 @@ def run_registration_task(chat_id, user_input, status_msg_id):
             page = context.new_page()
             
             try:
-                # Desktop reg page is often more stable for automation
-                page.goto("https://www.facebook.com/reg/")
+                # Use random entry points to evade rate limits
+                reg_links = [
+                    "https://www.facebook.com/reg/?entry_point=login",
+                    "https://m.facebook.com/reg/?entry_point=login",
+                    "https://mbasic.facebook.com/reg/?entry_point=login"
+                ]
+                page.goto(random.choice(reg_links))
                 page.wait_for_load_state('networkidle')
                 
                 update_status(f"⌨️ Filling Registration info for `{phone}`...")
                 
-                # Fill basic info based on the provided screenshot structure
-                page.get_by_label("First name").fill(first_name)
-                page.get_by_label("Surname").fill(surname)
+                # Fill basic info based on universal name attributes across all FB UIs
+                page.locator('input[name="firstname"]').fill(first_name)
+                page.locator('input[name="lastname"]').fill(surname)
                 
-                page.get_by_label("Mobile number or email address").fill(phone)
-                page.get_by_label("New password").fill(password)
+                page.locator('input[name="reg_email__"]').fill(phone)
+                page.locator('input[name="reg_passwd__"]').fill(password)
                 
-                # DOB dropdowns by name attribute are standard in desktop FB
+                # DOB dropdowns by name attribute are standard in desktop and mobile FB
                 page.locator('select[name="birthday_day"]').select_option(value=day)
                 page.locator('select[name="birthday_month"]').select_option(value=month_val)
                 page.locator('select[name="birthday_year"]').select_option(value=year)
@@ -351,7 +360,7 @@ def run_registration_task(chat_id, user_input, status_msg_id):
                 page.locator(f'input[name="sex"][value="{gender_val}"]').check()
                 
                 update_status(f"🖱️ Clicking 'Sign Up'...")
-                page.get_by_role("button", name="Sign Up", exact=True).click()
+                page.locator('button[name="websubmit"], input[name="websubmit"], [type="submit"]').first.click()
                 
                 update_status(f"🔎 Waiting for OTP confirmation page...")
                 
