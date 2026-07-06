@@ -180,6 +180,7 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
     if not phone.startswith('+'):
         phone = '+' + phone
 
+    page = None
     try:
         with sync_playwright() as p:
             update_status(f"🌐 Launching browser for `{phone}`...")
@@ -229,6 +230,15 @@ def run_playwright_task(chat_id, user_input, status_msg_id):
             
     except Exception as e:
         update_status(f"⚠️ **Error for `{phone}`:**\n{str(e)[:150]}...")
+        if page:
+            try:
+                error_snap = f"error_{phone.replace('+', '')}.png"
+                page.screenshot(path=error_snap)
+                with open(error_snap, 'rb') as snap_file:
+                    bot.send_photo(chat_id, snap_file, caption=f"⚠️ Error screen for `{phone}`")
+                os.remove(error_snap)
+            except:
+                pass
 
 def main():
     print("Installing Playwright browsers and OS dependencies if missing...")
